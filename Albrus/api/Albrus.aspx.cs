@@ -28,6 +28,7 @@ namespace Albrus.api
             return "Hello " + surname + " " + name + Environment.NewLine + "At " + DateTime.Now.ToLongTimeString();
         }
 
+        #region Method Project Create 
         [WebMethod]
         public static int ProgectCreate(string prName, string prInform, DateTime prDataStart, DateTime prDataEnd)
         {
@@ -73,9 +74,9 @@ namespace Albrus.api
                         p.information = prInform;
                         p.dataStart = prDataStart;
                         p.dataStart = prDataEnd;
-
-                        database.SubmitChanges();
                     }
+
+                    database.SubmitChanges();
                 }
 
                 resault = true;
@@ -100,11 +101,9 @@ namespace Albrus.api
                     IEnumerable<ProjectList> projectCurrent = database.ProjectLists.Where(projectList => projectList.idProj == prId);
 
                     foreach (ProjectList p in projectCurrent)
-                    {
                         p.visible = VISIBLE_TRUE;
 
-                        database.SubmitChanges();
-                    }
+                    database.SubmitChanges();
                 }
 
                 resault = true;
@@ -119,7 +118,7 @@ namespace Albrus.api
         }
 
         [WebMethod]
-        public static object ProjectGetAll()
+        public static string ProjectGetAll()
         {
             object buffer = null;
 
@@ -136,8 +135,163 @@ namespace Albrus.api
 
             }
 
-            return buffer;// JsonConvert.SerializeObject(
+            return JsonConvert.SerializeObject(buffer);
         }
+        #endregion
+
+        #region Method DashBoard Create
+        [WebMethod]
+        public static int DashCreate(int dashIdProj, string dashName, string dashInform)
+        {
+            int dashId = 0;
+
+            try
+            {
+                using (DataProjectListDataContext database = new DataProjectListDataContext())
+                {
+                    bool enmtyBoard = database.DashBoardTasks.Any();
+
+                    DashBoardTask board = new DashBoardTask();
+                    board.idProj = dashIdProj;
+                    board.name = dashName;
+                    board.information = dashInform;
+                    board.dataCreate = DateTime.Now;
+
+                    if (!enmtyBoard)
+                    {
+                        board.position = 0;
+                    }
+                    else
+                    {
+                        IList<DashBoardTask> dashBoardList = database.DashBoardTasks.Where(dash => dash.idProj == dashIdProj && dash.position.HasValue).ToList();
+                        board.position = dashBoardList.Count;
+                    }
+
+                    database.DashBoardTasks.InsertOnSubmit(board);
+                    database.SubmitChanges();
+
+
+                    dashId = board.idDash;
+                }
+
+            }
+
+            catch (Exception e)
+            {
+
+            }
+
+            return dashId;
+        }
+
+        [WebMethod]
+        public static bool DashUpdate(int dashId, string dashName, string dashInform)
+        {
+            try
+            {
+                using (DataProjectListDataContext database = new DataProjectListDataContext())
+                {
+                    IEnumerable<DashBoardTask> dashBoardList = database.DashBoardTasks.Where(dash => dash.idDash == dashId);
+
+                    foreach (DashBoardTask board in dashBoardList)
+                    {
+                        board.name = dashName;
+                        board.information = dashInform;
+                    }
+
+                    database.SubmitChanges();
+                }
+            }
+
+            catch (Exception e)
+            {
+
+            }
+            return true;
+        }
+
+        [WebMethod]
+        public static void DashMove(int dashId, int dashPosition)
+        {
+            try
+            {
+                using (DataProjectListDataContext database = new DataProjectListDataContext())
+                {
+                    IList<DashBoardTask> dashBoardList = database.DashBoardTasks.Where(dash => dash.idDash == dashId && dash.position.HasValue).ToList();
+                    DashBoardTask dashBoard = null;
+
+                    foreach (DashBoardTask d in dashBoardList)
+                        dashBoard = d;
+
+                    int idProj = 0;
+
+                    if (dashBoard.idProj.HasValue)
+                        idProj = dashBoard.idProj.Value;
+
+                    int count = dashBoardList.Count;
+
+                    if (dashPosition == 0)
+                    {
+                        AllMove(idProj, dashId, dashPosition, database);
+                        dashBoard.position = 0;
+                        database.SubmitChanges();
+                    }
+                    else if (dashPosition == count - 1)
+                    {
+                        AllMove(idProj, dashId, dashPosition, database);
+                        dashBoard.position = count - 1;
+                        database.SubmitChanges();
+                    }
+                    else
+                    {
+                        if (dashPosition > dashBoard.position)
+                        {
+                            IEnumerable<DashBoardTask> boardList = database.DashBoardTasks.Where(board => board.position > dashBoard.position && board.position <= dashPosition);
+
+                            foreach (DashBoardTask boardTask in boardList)
+                                boardTask.position = boardTask.position - 1;
+                        }
+                        else
+                        {
+                            IEnumerable<DashBoardTask> boardList = database.DashBoardTasks.Where(board => board.position < dashBoard.position && board.position >= dashPosition);
+
+                            foreach (DashBoardTask boardTask in boardList)
+                                boardTask.position = boardTask.position + 1;
+                        }
+
+                        dashBoard.position = dashPosition;
+                        database.SubmitChanges();
+                    }
+
+
+                }
+            }
+            catch (Exception e)
+            {
+
+            }
+        }
+
+        [WebMethod]
+        private static void AllMove(int idProj, int dashBoardId, int dashBoardPosition, DataProjectListDataContext database)
+        {
+            IEnumerable<DashBoardTask> dashBoardList = database.DashBoardTasks.Where(dash => (dash.idProj == idProj && dash.idDash != dashBoardId));
+
+            if (dashBoardPosition == 0)
+            {
+                foreach (DashBoardTask dashBoard in dashBoardList)
+                    dashBoard.position = dashBoard.position + 1;
+            }
+            else
+            {
+                foreach (DashBoardTask dashBoard in dashBoardList)
+                    dashBoard.position = dashBoard.position - 1;
+            }
+
+            database.SubmitChanges();
+        }
+
+        #endregion
 
         [WebMethod]
         public static object TaskGetAll()
